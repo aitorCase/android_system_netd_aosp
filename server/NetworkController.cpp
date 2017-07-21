@@ -30,6 +30,8 @@
 //     3. CommandListener only processes one command at a time. I.e., it's serialized.
 // Thus, no other mutation can occur in between the two statements above.
 
+#define LOG_NDEBUG 0
+
 #include "NetworkController.h"
 
 #define LOG_TAG "Netd"
@@ -60,6 +62,7 @@ const unsigned NetworkController::MAX_OEM_ID   = 50;
 const unsigned NetworkController::DUMMY_NET_ID = 51;
 // NetIds 52..98 are reserved for future use.
 const unsigned NetworkController::LOCAL_NET_ID = 99;
+const unsigned NetworkController::NONE_NET_ID = 98;
 
 // All calls to methods here are made while holding a write lock on mRWLock.
 class NetworkController::DelegateImpl : public PhysicalNetwork::Delegate {
@@ -135,14 +138,18 @@ int NetworkController::DelegateImpl::modifyFallthrough(const std::string& physic
 }
 
 NetworkController::NetworkController() :
-        mDelegateImpl(new NetworkController::DelegateImpl(this)), mDefaultNetId(NETID_UNSET),
-        mProtectableUsers({AID_VPN}) {
+        mDelegateImpl(new NetworkController::DelegateImpl(this)), mDefaultNetId(NETID_UNSET), 
+        mForcedNetId(NETID_UNSET), mProtectableUsers({AID_VPN}) {
     mNetworks[LOCAL_NET_ID] = new LocalNetwork(LOCAL_NET_ID);
     mNetworks[DUMMY_NET_ID] = new DummyNetwork(DUMMY_NET_ID);
 }
 
 unsigned NetworkController::getDefaultNetwork() const {
     android::RWLock::AutoRLock lock(mRWLock);
+    if (mForcedNetId != NETID_UNSET) {
+        ALOGE("Default network is forced NetID %u", mForcedNetId);
+        return mForcedNetId;
+    }
     return mDefaultNetId;
 }
 
@@ -180,6 +187,22 @@ int NetworkController::setDefaultNetwork(unsigned netId) {
     }
 
     mDefaultNetId = netId;
+    return 0;
+}
+
+unsigned NetworkController::getForcedNetwork() const {
+    android::RWLock::AutoRLock lock(mRWLock);
+    return mForcedNetId;
+}
+
+int NetworkController::setForcedNetwork(unsigned netId) {
+    android::RWLock::AutoWLock lock(mRWLock);
+
+    if (netId == mForcedNetId) {
+        return 0;
+    }
+
+    mForcedNetId = netId;
     return 0;
 }
 
@@ -249,6 +272,11 @@ unsigned NetworkController::getNetworkForConnect(uid_t uid) const {
     VirtualNetwork* virtualNetwork = getVirtualNetworkForUserLocked(uid);
     if (virtualNetwork && !virtualNetwork->isSecure()) {
         return virtualNetwork->getNetId();
+    }
+    
+    if (mForcedNetId != NETID_UNSET) {
+        ALOGE("Default network is forced NetID %u", mForcedNetId);
+        return mForcedNetId;
     }
     return mDefaultNetId;
 }

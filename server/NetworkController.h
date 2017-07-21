@@ -51,6 +51,9 @@ public:
     unsigned getDefaultNetwork() const;
     int setDefaultNetwork(unsigned netId) WARN_UNUSED_RESULT;
 
+    unsigned getForcedNetwork() const;
+    int setForcedNetwork(unsigned netId) WARN_UNUSED_RESULT;
+
     // Sets |*netId| to an appropriate NetId to use for DNS for the given user. Call with |*netId|
     // set to a non-NETID_UNSET value if the user already has indicated a preference. Returns the
     // fwmark value to set on the socket when performing the DNS request.
@@ -110,6 +113,7 @@ private:
     // mRWLock guards all accesses to mDefaultNetId, mNetworks, mUsers and mProtectableUsers.
     mutable android::RWLock mRWLock;
     unsigned mDefaultNetId;
+    unsigned mForcedNetId;
     std::map<unsigned, Network*> mNetworks;  // Map keys are NetIds.
     std::map<uid_t, Permission> mUsers;
     std::set<uid_t> mProtectableUsers;

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-// #define LOG_NDEBUG 0
+#define LOG_NDEBUG 0
 
 #include <stdlib.h>
 #include <sys/socket.h>
@@ -1778,6 +1778,29 @@ int CommandListener::NetworkCommand::runCommand(SocketClient* client, int argc, 
             gCtls->netCtrl.denyProtect(uids);
         } else {
             return syntaxError(client, "Unknown argument");
+        }
+        return success(client);
+    }
+
+    //    0       1      2      3
+    // network force  set  <netId>
+    // network force clear
+    if (!strcmp(argv[1], "force")) {
+        if (argc < 3) {
+            return syntaxError(client, "Missing argument");
+        }
+        unsigned netId = NETID_UNSET;
+        if (!strcmp(argv[2], "set")) {
+            if (argc < 4) {
+                return syntaxError(client, "Missing netId");
+            }
+            netId = stringToNetId(argv[3]);
+        } else if (strcmp(argv[2], "clear")) {
+            return syntaxError(client, "Unknown argument");
+        }
+        ALOGE("network force %s %s", argv[2], (argc == 4) ? argv[3] : "");
+        if (int ret = sNetCtrl->setForcedNetwork(netId)) {
+            return operationError(client, "setForceNetwork() failed", ret);
         }
         return success(client);
     }
