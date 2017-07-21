@@ -45,6 +45,7 @@ public:
     static const unsigned MAX_OEM_ID;
     static const unsigned LOCAL_NET_ID;
     static const unsigned DUMMY_NET_ID;
+    static const unsigned NONE_NET_ID;
 
     NetworkController();
 
@@ -114,6 +115,7 @@ private:
     mutable android::RWLock mRWLock;
     unsigned mDefaultNetId;
     unsigned mForcedNetId;
+    std::string mForcedInterface;
     std::map<unsigned, Network*> mNetworks;  // Map keys are NetIds.
     std::map<uid_t, Permission> mUsers;
     std::set<uid_t> mProtectableUsers;

@@ -202,7 +202,28 @@ int NetworkController::setForcedNetwork(unsigned netId) {
         return 0;
     }
 
+    if (netId != NETID_UNSET) {
+        Network* network = getNetworkLocked(netId);
+        if (!network) {
+            ALOGE("no such netId %u", netId);
+            return -ENONET;
+        }
+        if (network->getType() != Network::PHYSICAL) {
+            ALOGE("cannot force to non-physical network with netId %u", netId);
+            return -EINVAL;
+        }
+        std::set<std::string> interfaces = network->getInterfaces();
+        if (interfaces.empty()) {
+            ALOGE("no interface for network with netId %u", netId);
+            return -EINVAL;
+        }
+        mForcedInterface = *interfaces.begin();
+    } else {
+        mForcedInterface = "";
+    }
+
     mForcedNetId = netId;
+    ALOGE("forcing network to netId %u (interface %s)", mForcedNetId, mForcedInterface.c_str());
     return 0;
 }
 
