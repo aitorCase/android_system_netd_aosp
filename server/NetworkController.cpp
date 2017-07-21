@@ -146,7 +146,8 @@ NetworkController::NetworkController() :
 
 unsigned NetworkController::getDefaultNetwork() const {
     android::RWLock::AutoRLock lock(mRWLock);
-    if (mForcedNetId != NETID_UNSET) {
+    // TODO: put this in FwMarkServer of crate getDefaultNetworkForConnect/FwMarkServer?
+    if ((mForcedNetId != NETID_UNSET) && (mForcedNetId != NONE_NET_ID)) {
         ALOGE("Default network is forced NetID %u", mForcedNetId);
         return mForcedNetId;
     }
@@ -441,6 +442,12 @@ int NetworkController::destroyNetwork(unsigned netId) {
     mNetworks.erase(netId);
     delete network;
     _resolv_delete_cache_for_net(netId);
+
+    if(netId == mForcedNetId) {
+        mForcedNetId = NONE_NET_ID;
+        ALOGE("forced netId set to %u", mForcedNetId);
+    }
+
     return ret;
 }
 
@@ -457,7 +464,14 @@ int NetworkController::addInterfaceToNetwork(unsigned netId, const char* interfa
     }
 
     android::RWLock::AutoWLock lock(mRWLock);
-    return getNetworkLocked(netId)->addInterface(interface);
+    Network* network = getNetworkLocked(netId);
+    int ret = network->addInterface(interface);
+    if ((mForcedNetId == NONE_NET_ID) && !ret && network->hasInterface(mForcedInterface)) {
+        mForcedNetId = netId;
+        ALOGE("forced netId set to %u", mForcedNetId);
+    }
+
+    return ret;
 }
 
 int NetworkController::removeInterfaceFromNetwork(unsigned netId, const char* interface) {
@@ -468,6 +482,7 @@ int NetworkController::removeInterfaceFromNetwork(unsigned netId, const char* in
 
     android::RWLock::AutoWLock lock(mRWLock);
     return getNetworkLocked(netId)->removeInterface(interface);
+    // TODO: check if removed interface is mForcedInterface?
 }
 
 Permission NetworkController::getPermissionForUser(uid_t uid) const {
