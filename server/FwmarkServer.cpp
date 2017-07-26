@@ -102,7 +102,7 @@ int FwmarkServer::processClient(SocketClient* client, int* socketFd) {
 
     switch (command.cmdId) {
         case FwmarkCommand::ON_ACCEPT: {
-            ALOGE("ON_ACCEPT uid: %u", client->getUid());
+            ALOGE("ON_ACCEPT prev. mark: %05x  uid: %u", fwmark.intValue, client->getUid());
             // Called after a socket accept(). The kernel would've marked the NetId and necessary
             // permissions bits, so we just add the rest of the user's permissions here.
             permission = static_cast<Permission>(permission | fwmark.permission);
@@ -143,7 +143,7 @@ int FwmarkServer::processClient(SocketClient* client, int* socketFd) {
             //
             // So, overall (when the explicit bit is not set but the protect bit is set), if the
             // existing NetId is a VPN, don't reset it. Else, set the default network's NetId.
-            ALOGE("ON_CONNECT uid: %u", client->getUid());
+            ALOGE("ON_CONNECT prev. mark: %05x uid: %u", fwmark.intValue, client->getUid());
             if (!fwmark.explicitlySelected) {
                 if (!fwmark.protectedFromVpn) {
                     fwmark.netId = mNetworkController->getNetworkForConnect(client->getUid());
@@ -155,7 +155,7 @@ int FwmarkServer::processClient(SocketClient* client, int* socketFd) {
         }
 
         case FwmarkCommand::SELECT_NETWORK: {
-            ALOGE("SELECT_NETWORK uid: %u", client->getUid());
+            ALOGE("SELECT_NETWORK prev. mark: %05x uid: %u", fwmark.intValue, client->getUid());
             fwmark.netId = command.netId;
             if (command.netId == NETID_UNSET) {
                 fwmark.explicitlySelected = false;
@@ -173,7 +173,7 @@ int FwmarkServer::processClient(SocketClient* client, int* socketFd) {
         }
 
         case FwmarkCommand::PROTECT_FROM_VPN: {
-            ALOGE("PROTECT_FROM_VPN uid: %u", client->getUid());
+            ALOGE("PROTECT_FROM_VPN prev. mark: %05x uid: %u", fwmark.intValue, client->getUid());
             if (!mNetworkController->canProtect(client->getUid())) {
                 return -EPERM;
             }
@@ -192,7 +192,7 @@ int FwmarkServer::processClient(SocketClient* client, int* socketFd) {
         }
 
         case FwmarkCommand::SELECT_FOR_USER: {
-            ALOGE("SELECT_FOR_USER uid: %u", client->getUid());
+            ALOGE("SELECT_FOR_USER prev. mark: %05x uid: %u", fwmark.intValue, client->getUid());
             if ((permission & PERMISSION_SYSTEM) != PERMISSION_SYSTEM) {
                 return -EPERM;
             }
@@ -209,7 +209,7 @@ int FwmarkServer::processClient(SocketClient* client, int* socketFd) {
 
     fwmark.permission = permission;
 
-    ALOGE("Set mark: %d, uid: %u", fwmark.intValue, client->getUid());
+    ALOGE("Set mark: %05x, uid: %u", fwmark.intValue, client->getUid());
 
     if (setsockopt(*socketFd, SOL_SOCKET, SO_MARK, &fwmark.intValue,
                    sizeof(fwmark.intValue)) == -1) {
