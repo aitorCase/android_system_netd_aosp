@@ -199,6 +199,9 @@ unsigned NetworkController::getForcedNetwork() const {
 int NetworkController::setForcedNetwork(unsigned netId) {
     android::RWLock::AutoWLock lock(mRWLock);
 
+    std::string interface;
+    Permission permission;
+
     if (netId == mForcedNetId) {
         return 0;
     }
@@ -216,14 +219,27 @@ int NetworkController::setForcedNetwork(unsigned netId) {
         std::set<std::string> interfaces = network->getInterfaces();
         if (interfaces.empty()) {
             ALOGE("no interface for network with netId %u", netId);
-            return -EINVAL;
+            return -ENODEV;
         }
-        mForcedInterface = *interfaces.begin();
+        interface = *interfaces.begin();
+        permission = static_cast<PhysicalNetwork*>(network)->getPermission();
+        if (int ret = RouteController::addInterfaceToForcedNetwork(interface.c_str(), permission)) {
+            return ret;
+        }
     } else {
-        mForcedInterface = "";
+        interface = "";
+    }
+
+    if (mForcedNetId != NETID_UNSET) {
+        if (int ret = RouteController::removeInterfaceFromForcedNetwork(mForcedInterface.c_str(),
+                                                                        mForcedPermission)) {
+            return ret;
+        }
     }
 
     mForcedNetId = netId;
+    mForcedInterface = interface;
+    mForcedPermission = permission;
     ALOGE("forcing network to netId %u (interface %s)", mForcedNetId, mForcedInterface.c_str());
     return 0;
 }
@@ -418,6 +434,7 @@ int NetworkController::destroyNetwork(unsigned netId) {
 
     android::RWLock::AutoWLock lock(mRWLock);
     Network* network = getNetworkLocked(netId);
+    Permission permission = static_cast<PhysicalNetwork*>(network)->getPermission();            
 
     // If we fail to destroy a network, things will get stuck badly. Therefore, unlike most of the
     // other network code, ignore failures and attempt to clear out as much state as possible, even
@@ -444,6 +461,11 @@ int NetworkController::destroyNetwork(unsigned netId) {
     _resolv_delete_cache_for_net(netId);
 
     if(netId == mForcedNetId) {
+        if (int err = RouteController::removeForcedNetworkRule(mForcedInterface.c_str(), permission)){
+            if (!ret) {
+                ret = err;
+            }
+        }
         mForcedNetId = NONE_NET_ID;
         ALOGE("forced netId set to %u", mForcedNetId);
     }
@@ -465,13 +487,21 @@ int NetworkController::addInterfaceToNetwork(unsigned netId, const char* interfa
 
     android::RWLock::AutoWLock lock(mRWLock);
     Network* network = getNetworkLocked(netId);
-    int ret = network->addInterface(interface);
-    if ((mForcedNetId == NONE_NET_ID) && !ret && network->hasInterface(mForcedInterface)) {
-        mForcedNetId = netId;
-        ALOGE("forced netId set to %u", mForcedNetId);
+    if (int ret = network->addInterface(interface)) {
+        return ret;
     }
 
-    return ret;
+    if ((mForcedNetId == NONE_NET_ID) && network->hasInterface(mForcedInterface)) {
+        ALOGE("addInterfaceToNetwork(): forced netId set to %u", mForcedNetId);
+        Permission permission = static_cast<PhysicalNetwork*>(network)->getPermission();
+        if (int ret = RouteController::addForcedNetworkRule(mForcedInterface.c_str(), permission)) {
+            return ret;
+        }
+        mForcedNetId = netId;
+        mForcedPermission = permission;
+    }
+
+    return 0;
 }
 
 int NetworkController::removeInterfaceFromNetwork(unsigned netId, const char* interface) {
