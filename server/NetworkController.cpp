@@ -274,7 +274,12 @@ uint32_t NetworkController::getNetworkForDns(unsigned* netId, uid_t uid) const {
         } else {
             // TODO: return an error instead of silently doing the DNS lookup on the wrong network.
             // http://b/27560555
-            *netId = mDefaultNetId;
+            if (mForcedNetId != NETID_UNSET) {
+                ALOGE("DNS: using netID %u", mForcedNetId);
+                *netId = mForcedNetId;
+            } else {
+                *netId = mDefaultNetId;
+            }
         }
     }
     fwmark.netId = *netId;
