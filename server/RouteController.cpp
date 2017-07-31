@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#define LOG_NDEBUG 0
+
 #include "RouteController.h"
 
 #include <arpa/inet.h>
@@ -52,23 +54,26 @@ auto RouteController::iptablesRestoreCommandFunction = execIptablesRestoreComman
 
 // BEGIN CONSTANTS --------------------------------------------------------------------------------
 
-const uint32_t RULE_PRIORITY_VPN_OVERRIDE_SYSTEM = 10000;
-const uint32_t RULE_PRIORITY_VPN_OVERRIDE_OIF    = 10500;
-const uint32_t RULE_PRIORITY_VPN_OUTPUT_TO_LOCAL = 11000;
-const uint32_t RULE_PRIORITY_SECURE_VPN          = 12000;
-const uint32_t RULE_PRIORITY_PROHIBIT_NON_VPN    = 12500;
-const uint32_t RULE_PRIORITY_EXPLICIT_NETWORK    = 13000;
-const uint32_t RULE_PRIORITY_OUTPUT_INTERFACE    = 14000;
-const uint32_t RULE_PRIORITY_LEGACY_SYSTEM       = 15000;
-const uint32_t RULE_PRIORITY_LEGACY_NETWORK      = 16000;
-const uint32_t RULE_PRIORITY_LOCAL_NETWORK       = 17000;
-const uint32_t RULE_PRIORITY_TETHERING           = 18000;
-const uint32_t RULE_PRIORITY_IMPLICIT_NETWORK    = 19000;
-const uint32_t RULE_PRIORITY_BYPASSABLE_VPN      = 20000;
-const uint32_t RULE_PRIORITY_VPN_FALLTHROUGH     = 21000;
-const uint32_t RULE_PRIORITY_DEFAULT_NETWORK     = 22000;
-const uint32_t RULE_PRIORITY_DIRECTLY_CONNECTED  = 23000;
-const uint32_t RULE_PRIORITY_UNREACHABLE         = 32000;
+const uint32_t RULE_PRIORITY_VPN_OVERRIDE_SYSTEM        = 10000;
+const uint32_t RULE_PRIORITY_VPN_OVERRIDE_OIF           = 10500;
+const uint32_t RULE_PRIORITY_VPN_OUTPUT_TO_LOCAL        = 11000;
+const uint32_t RULE_PRIORITY_SECURE_VPN                 = 12000;
+const uint32_t RULE_PRIORITY_PROHIBIT_NON_VPN           = 12500;
+const uint32_t RULE_PRIORITY_EXPLICIT_NETWORK           = 13000;
+const uint32_t RULE_PRIORITY_OUTPUT_INTERFACE           = 14000;
+const uint32_t RULE_PRIORITY_LEGACY_SYSTEM              = 15000;
+const uint32_t RULE_PRIORITY_LEGACY_NETWORK             = 16000;
+const uint32_t RULE_PRIORITY_LOCAL_NETWORK              = 17000;
+const uint32_t RULE_PRIORITY_TETHERING                  = 18000;
+const uint32_t RULE_PRIORITY_IMPLICIT_NETWORK           = 19000;
+const uint32_t RULE_PRIORITY_BYPASSABLE_VPN             = 20000;
+const uint32_t RULE_PRIORITY_VPN_FALLTHROUGH            = 21000;
+const uint32_t RULE_PRIORITY_FORCED_NETWORK             = 21500;
+const uint32_t RULE_PRIORITY_FORCED_NETWORK_DIRECTLY    = 21600;
+const uint32_t RULE_PRIORITY_FORCED_NETWORK_UNREACHABLE = 21700;
+const uint32_t RULE_PRIORITY_DEFAULT_NETWORK            = 22000;
+const uint32_t RULE_PRIORITY_DIRECTLY_CONNECTED         = 23000;
+const uint32_t RULE_PRIORITY_UNREACHABLE                = 32000;
 
 const uint32_t ROUTE_TABLE_LOCAL_NETWORK  = 97;
 const uint32_t ROUTE_TABLE_LEGACY_NETWORK = 98;
@@ -688,6 +693,61 @@ int configureDummyNetwork() {
     return 0;
 }
 
+// Add a rule similar to the "default network" rule with higher priority and the forced interface 
+// table.
+WARN_UNUSED_RESULT int modifyForcedNetworkRule(uint16_t action, const char* interface,
+                                               Permission permission) {
+
+    ALOGE("modifyForcedNetworkRule called for interface %s", interface);
+    uint32_t table = getRouteTableForInterface(interface);
+    if (table == RT_TABLE_UNSPEC) {
+        return -ESRCH;
+    }
+
+    Fwmark fwmark;
+    Fwmark mask;
+
+    fwmark.netId = NETID_UNSET;
+    mask.netId = FWMARK_NET_ID_MASK;
+
+    fwmark.permission = permission;
+    mask.permission = permission;
+
+    // TODO: delete log
+    int ret = modifyIpRule(action, RULE_PRIORITY_FORCED_NETWORK, table, fwmark.intValue, mask.intValue);
+    ALOGE("modifyForcedNetworkRule ModifyIpRule return: %d", ret);
+    return ret;
+}
+
+// When forcing an interface, add a rule similar to the directly connected rule, so the added
+// unreachable rule does not block it.
+WARN_UNUSED_RESULT int modifyForcedNetworkDirectlyRule(uint16_t action) {
+    Fwmark fwmark;
+    Fwmark mask;
+
+    fwmark.netId = NETID_UNSET;
+    mask.netId = FWMARK_NET_ID_MASK;
+
+    return modifyIpRule(action, RULE_PRIORITY_FORCED_NETWORK_DIRECTLY, RT_TABLE_MAIN,
+                        fwmark.intValue, mask.intValue, IIF_NONE, OIF_NONE, UID_ROOT, UID_ROOT);
+}
+
+// Add an unreachable rule overriding the default network rule when there is a forced interfaces.
+// If the forced interface goes down, the network is unreachable.
+WARN_UNUSED_RESULT int modifyForcedNetworkUnreachableRule(uint16_t action, Permission permission) {
+    Fwmark fwmark;
+    Fwmark mask;
+
+    fwmark.netId = NETID_UNSET;
+    mask.netId = FWMARK_NET_ID_MASK;
+
+    fwmark.permission = permission;
+    mask.permission = permission;
+
+    return modifyIpRule(action, RULE_PRIORITY_FORCED_NETWORK_UNREACHABLE, RT_TABLE_UNSPEC,
+                        fwmark.intValue, mask.intValue);
+}
+
 // Add a new rule to look up the 'main' table, with the same selectors as the "default network"
 // rule, but with a lower priority. We will never create routes in the main table; it should only be
 // used for directly-connected routes implicitly created by the kernel when adding IP addresses.
@@ -841,6 +901,28 @@ WARN_UNUSED_RESULT int modifyDefaultNetwork(uint16_t action, const char* interfa
 
     return modifyIpRule(action, RULE_PRIORITY_DEFAULT_NETWORK, table, fwmark.intValue,
                         mask.intValue);
+}
+
+WARN_UNUSED_RESULT int modifyForcedNetwork(uint16_t action, const char* interface,
+                                           Permission permission) {
+    int ret = 0;
+    int err = 0;
+    err = modifyForcedNetworkDirectlyRule(action);
+    if (!err) {
+        ret = err;
+    }
+    err = modifyForcedNetworkUnreachableRule(action, permission);
+    if (!err) {
+        ret = err;
+    }
+    // Forced Network Rule could not exists if interface went down.
+    // Return value is not used, that is the reason to delete this rule at the end.
+
+    if ((err = modifyForcedNetworkRule(action, interface, permission))) {
+        ALOGE("modifyForcedNetworkRule error: %d", err);
+    }
+
+    return ret;
 }
 
 WARN_UNUSED_RESULT int modifyTetheredNetwork(uint16_t action, const char* inputInterface,
@@ -1062,6 +1144,23 @@ int RouteController::addInterfaceToDefaultNetwork(const char* interface, Permiss
 int RouteController::removeInterfaceFromDefaultNetwork(const char* interface,
                                                        Permission permission) {
     return modifyDefaultNetwork(RTM_DELRULE, interface, permission);
+}
+
+int RouteController::addForcedNetworkRule(const char* interface, Permission permission) {
+    return modifyForcedNetworkRule(RTM_NEWRULE, interface, permission);
+}
+
+int RouteController::removeForcedNetworkRule(const char* interface, Permission permission) {
+    return modifyForcedNetworkRule(RTM_DELRULE, interface, permission);
+}
+
+int RouteController::addInterfaceToForcedNetwork(const char* interface, Permission permission) {
+    return modifyForcedNetwork(RTM_NEWRULE, interface, permission);
+}
+
+int RouteController::removeInterfaceFromForcedNetwork(const char* interface,
+                                                       Permission permission) {
+    return modifyForcedNetwork(RTM_DELRULE, interface, permission);
 }
 
 int RouteController::addRoute(const char* interface, const char* destination, const char* nexthop,
