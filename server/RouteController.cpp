@@ -707,6 +707,9 @@ WARN_UNUSED_RESULT int modifyForcedNetworkRule(uint16_t action, const char* inte
     fwmark.netId = NETID_UNSET;
     mask.netId = FWMARK_NET_ID_MASK;
 
+    fwmark.protectedFromVpn = false;
+    mask.protectedFromVpn = true;
+
     fwmark.permission = permission;
     mask.permission = permission;
 
@@ -737,6 +740,9 @@ WARN_UNUSED_RESULT int modifyForcedNetworkUnreachableRule(uint16_t action, Permi
 
     fwmark.netId = NETID_UNSET;
     mask.netId = FWMARK_NET_ID_MASK;
+
+    fwmark.protectedFromVpn = false;
+    mask.protectedFromVpn = true;
 
     fwmark.permission = permission;
     mask.permission = permission;
