@@ -293,7 +293,13 @@ unsigned NetworkController::getNetworkForUser(uid_t uid) const {
     if (VirtualNetwork* virtualNetwork = getVirtualNetworkForUserLocked(uid)) {
         return virtualNetwork->getNetId();
     }
-    return mDefaultNetId;
+
+    if (mForcedNetId != NETID_UNSET) {
+        ALOGE("NetworForUser: using netID %u", mForcedNetId);
+        return mForcedNetId;
+    } else {
+        return mDefaultNetId;
+    }
 }
 
 // Returns the NetId that will be set when a socket connect()s. This is the bypassable VPN that
