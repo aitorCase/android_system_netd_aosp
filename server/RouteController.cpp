@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-#define LOG_NDEBUG 0
-
 #include "RouteController.h"
 
 #include <arpa/inet.h>
@@ -695,7 +693,6 @@ int configureDummyNetwork() {
 WARN_UNUSED_RESULT int modifyForcedNetworkRule(uint16_t action, const char* interface,
                                                Permission permission) {
 
-    ALOGE("modifyForcedNetworkRule called for interface %s", interface);
     uint32_t table = getRouteTableForInterface(interface);
     if (table == RT_TABLE_UNSPEC) {
         return -ESRCH;
@@ -713,10 +710,7 @@ WARN_UNUSED_RESULT int modifyForcedNetworkRule(uint16_t action, const char* inte
     fwmark.permission = permission;
     mask.permission = permission;
 
-    // TODO: delete log
-    int ret = modifyIpRule(action, RULE_PRIORITY_FORCED_NETWORK, table, fwmark.intValue, mask.intValue);
-    ALOGE("modifyForcedNetworkRule ModifyIpRule return: %d", ret);
-    return ret;
+    return modifyIpRule(action, RULE_PRIORITY_FORCED_NETWORK, table, fwmark.intValue, mask.intValue);
 }
 
 // When forcing an interface, add a rule similar to the directly connected rule, so the added
