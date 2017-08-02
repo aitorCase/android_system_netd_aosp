@@ -30,8 +30,6 @@
 //     3. CommandListener only processes one command at a time. I.e., it's serialized.
 // Thus, no other mutation can occur in between the two statements above.
 
-#define LOG_NDEBUG 0
-
 #include "NetworkController.h"
 
 #define LOG_TAG "Netd"
@@ -146,9 +144,7 @@ NetworkController::NetworkController() :
 
 unsigned NetworkController::getDefaultNetwork() const {
     android::RWLock::AutoRLock lock(mRWLock);
-    // TODO: put this in FwMarkServer of crate getDefaultNetworkForConnect/FwMarkServer?
     if ((mForcedNetId != NETID_UNSET) && (mForcedNetId != NONE_NET_ID)) {
-        ALOGE("Default network is forced NetID %u", mForcedNetId);
         return mForcedNetId;
     }
     return mDefaultNetId;
@@ -240,7 +236,6 @@ int NetworkController::setForcedNetwork(unsigned netId) {
     mForcedNetId = netId;
     mForcedInterface = interface;
     mForcedPermission = permission;
-    ALOGE("forcing network to netId %u (interface %s)", mForcedNetId, mForcedInterface.c_str());
     return 0;
 }
 
@@ -275,7 +270,6 @@ uint32_t NetworkController::getNetworkForDns(unsigned* netId, uid_t uid) const {
             // TODO: return an error instead of silently doing the DNS lookup on the wrong network.
             // http://b/27560555
             if (mForcedNetId != NETID_UNSET) {
-                ALOGE("DNS: using netID %u", mForcedNetId);
                 *netId = mForcedNetId;
             } else {
                 *netId = mDefaultNetId;
@@ -295,7 +289,6 @@ unsigned NetworkController::getNetworkForUser(uid_t uid) const {
     }
 
     if (mForcedNetId != NETID_UNSET) {
-        ALOGE("NetworForUser: using netID %u", mForcedNetId);
         return mForcedNetId;
     } else {
         return mDefaultNetId;
@@ -324,7 +317,6 @@ unsigned NetworkController::getNetworkForConnect(uid_t uid) const {
     }
     
     if (mForcedNetId != NETID_UNSET) {
-        ALOGE("Default network is forced NetID %u", mForcedNetId);
         return mForcedNetId;
     }
     return mDefaultNetId;
@@ -445,7 +437,7 @@ int NetworkController::destroyNetwork(unsigned netId) {
 
     android::RWLock::AutoWLock lock(mRWLock);
     Network* network = getNetworkLocked(netId);
-    Permission permission = static_cast<PhysicalNetwork*>(network)->getPermission();            
+    Permission permission = static_cast<PhysicalNetwork*>(network)->getPermission();
 
     // If we fail to destroy a network, things will get stuck badly. Therefore, unlike most of the
     // other network code, ignore failures and attempt to clear out as much state as possible, even
@@ -478,7 +470,6 @@ int NetworkController::destroyNetwork(unsigned netId) {
             }
         }
         mForcedNetId = NONE_NET_ID;
-        ALOGE("forced netId set to %u", mForcedNetId);
     }
 
     return ret;
@@ -503,7 +494,6 @@ int NetworkController::addInterfaceToNetwork(unsigned netId, const char* interfa
     }
 
     if ((mForcedNetId == NONE_NET_ID) && network->hasInterface(mForcedInterface)) {
-        ALOGE("addInterfaceToNetwork(): forced netId set to %u", mForcedNetId);
         Permission permission = static_cast<PhysicalNetwork*>(network)->getPermission();
         if (int ret = RouteController::addForcedNetworkRule(mForcedInterface.c_str(), permission)) {
             return ret;
