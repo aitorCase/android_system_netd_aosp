@@ -1605,24 +1605,31 @@ int CommandListener::NetworkCommand::runCommand(SocketClient* client, int argc, 
     }
 
     //    0       1      2      3
-    // network force  set  <netId>
-    // network force clear
+    // network force    set  <netId>
+    // network force   clear
+    // network force    show
     if (!strcmp(argv[1], "force")) {
         if (argc < 3) {
             return syntaxError(client, "Missing argument");
         }
-        unsigned netId = NETID_UNSET;
         if (!strcmp(argv[2], "set")) {
             if (argc < 4) {
                 return syntaxError(client, "Missing netId");
             }
-            netId = stringToNetId(argv[3]);
-        } else if (strcmp(argv[2], "clear")) {
+            unsigned netId = stringToNetId(argv[3]);
+            if (int ret = sNetCtrl->setForcedNetwork(netId)) {
+                return operationError(client, "setForceNetwork() failed", ret);
+            }
+        } else if (!strcmp(argv[2], "clear")) {
+            ALOGE("network force %s %s", argv[2], (argc == 4) ? argv[3] : "");
+            if (int ret = sNetCtrl->setForcedNetwork(NETID_UNSET)) {
+                return operationError(client, "setForceNetwork() failed", ret);
+            }
+        } else if (!strcmp(argv[2], "show")) {
+            // TODO: ResponseCode is hardcoded. It should be defined in ResponseCode.h
+            client->sendMsg(230, std::to_string(sNetCtrl->getForcedNetwork()).c_str(), false);
+        } else {
             return syntaxError(client, "Unknown argument");
-        }
-        ALOGE("network force %s %s", argv[2], (argc == 4) ? argv[3] : "");
-        if (int ret = sNetCtrl->setForcedNetwork(netId)) {
-            return operationError(client, "setForceNetwork() failed", ret);
         }
         return success(client);
     }
