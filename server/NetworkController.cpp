@@ -62,6 +62,8 @@ const unsigned NetworkController::DUMMY_NET_ID = 51;
 const unsigned NetworkController::LOCAL_NET_ID = 99;
 const unsigned NetworkController::NONE_NET_ID = 98;
 
+const std::string NetworkController::INTERFACE_UNREACHABLE = std::string("unreachable");
+
 // All calls to methods here are made while holding a write lock on mRWLock.
 class NetworkController::DelegateImpl : public PhysicalNetwork::Delegate {
 public:
@@ -237,6 +239,20 @@ int NetworkController::setForcedNetwork(unsigned netId) {
     mForcedInterface = interface;
     mForcedPermission = permission;
     return 0;
+}
+
+std::string NetworkController::getForcedInterface() const {
+    android::RWLock::AutoRLock lock(mRWLock);
+    return (mForcedNetId == NONE_NET_ID) ? INTERFACE_UNREACHABLE : mForcedInterface;
+}
+
+int NetworkController::setForcedInterface(std::string interface) {
+    unsigned network = getNetworkForInterface(interface.c_str());
+    if (network == NETID_UNSET) {
+        ALOGE("no network for interface %s", interface.c_str());
+        return -ENONET;
+    }
+    return setForcedNetwork(network);
 }
 
 uint32_t NetworkController::getNetworkForDns(unsigned* netId, uid_t uid) const {

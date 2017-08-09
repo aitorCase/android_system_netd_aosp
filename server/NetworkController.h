@@ -47,6 +47,8 @@ public:
     static const unsigned DUMMY_NET_ID;
     static const unsigned NONE_NET_ID;
 
+    static const std::string INTERFACE_UNREACHABLE;
+
     NetworkController();
 
     unsigned getDefaultNetwork() const;
@@ -54,6 +56,8 @@ public:
 
     unsigned getForcedNetwork() const;
     int setForcedNetwork(unsigned netId) WARN_UNUSED_RESULT;
+    std::string getForcedInterface() const;
+    int setForcedInterface(std::string interface) WARN_UNUSED_RESULT;
 
     // Sets |*netId| to an appropriate NetId to use for DNS for the given user. Call with |*netId|
     // set to a non-NETID_UNSET value if the user already has indicated a preference. Returns the
