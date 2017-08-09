@@ -1604,33 +1604,66 @@ int CommandListener::NetworkCommand::runCommand(SocketClient* client, int argc, 
         return success(client);
     }
 
-    //    0       1      2      3
-    // network force    set  <netId>
-    // network force   clear
-    // network force    show
+    //    0      1      2       3     4
+    // network force network   set  <netId>
+    // network force network   show
+    // network force interface set  <interface>
+    // network force interface show
+    // network force  clear
     if (!strcmp(argv[1], "force")) {
         if (argc < 3) {
             return syntaxError(client, "Missing argument");
         }
-        if (!strcmp(argv[2], "set")) {
+
+        if (!strcmp(argv[2], "network") || !strcmp(argv[2], "interface")) {
             if (argc < 4) {
-                return syntaxError(client, "Missing netId");
+                return syntaxError(client, "Missing argument");
             }
-            unsigned netId = stringToNetId(argv[3]);
-            if (int ret = sNetCtrl->setForcedNetwork(netId)) {
-                return operationError(client, "setForceNetwork() failed", ret);
+
+            bool forceNetwork = !strcmp(argv[2], "network");
+            bool forceInterface = !strcmp(argv[2], "interface");
+            if (!forceNetwork && !forceInterface) {
+                return syntaxError(client, "Unknown argument");
+            }
+
+            if (!strcmp(argv[3], "set")) {
+                if (argc < 5) {
+                    if (forceNetwork) {
+                        return syntaxError(client, "Missing netId");
+                    } else {
+                        return syntaxError(client, "Missing interface");
+                    }
+                }
+                if (forceNetwork) {
+                    unsigned netId = stringToNetId(argv[4]);
+                    if (int ret = sNetCtrl->setForcedNetwork(netId)) {
+                        return operationError(client, "setForceNetwork() failed", ret);
+                    }
+                } else {
+                    if (int ret = sNetCtrl->setForcedInterface(std::string(argv[4]))) {
+                        return operationError(client, "setForceNetwork() failed", ret);
+                    }
+                }
+            } else if (!strcmp(argv[3], "show")) {
+                if (forceNetwork) {
+                    // TODO: ResponseCode is hardcoded. It should be defined in ResponseCode.h
+                    client->sendMsg(230, std::to_string(sNetCtrl->getForcedNetwork()).c_str(), false);
+                } else {
+                    //std::string interface = sNetCtrl->getForcedInterface();
+                    //client->sendMsg(230, interface.empty() ? "unreachable" : interface.c_str(), false);
+                    client->sendMsg(230, sNetCtrl->getForcedInterface().c_str(), false);
+                }
+            } else {
+                return syntaxError(client, "Unknown argument");
             }
         } else if (!strcmp(argv[2], "clear")) {
-            ALOGE("network force %s %s", argv[2], (argc == 4) ? argv[3] : "");
             if (int ret = sNetCtrl->setForcedNetwork(NETID_UNSET)) {
                 return operationError(client, "setForceNetwork() failed", ret);
             }
-        } else if (!strcmp(argv[2], "show")) {
-            // TODO: ResponseCode is hardcoded. It should be defined in ResponseCode.h
-            client->sendMsg(230, std::to_string(sNetCtrl->getForcedNetwork()).c_str(), false);
         } else {
             return syntaxError(client, "Unknown argument");
         }
+
         return success(client);
     }
 
