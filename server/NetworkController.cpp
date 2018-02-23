@@ -241,6 +241,7 @@ int NetworkController::setForcedNetwork(unsigned netId) {
     return 0;
 }
 
+
 std::string NetworkController::getForcedInterface() const {
     android::RWLock::AutoRLock lock(mRWLock);
     return (mForcedNetId == NONE_NET_ID) ? INTERFACE_UNREACHABLE : mForcedInterface;
@@ -253,6 +254,18 @@ int NetworkController::setForcedInterface(std::string interface) {
         return -ENONET;
     }
     return setForcedNetwork(network);
+}
+
+void NetworkController::addNotForcedDnsUsers(const std::vector<uid_t>& uids) {
+    android::RWLock::AutoWLock lock(mRWLock);
+    mNotForcedDnsUsers.insert(uids.begin(), uids.end());
+}
+
+void NetworkController::removeNotForcedDnsUsers(const std::vector<uid_t>& uids) {
+    android::RWLock::AutoWLock lock(mRWLock);
+    for (uid_t uid : uids) {
+        mNotForcedDnsUsers.erase(uid);
+    }
 }
 
 uint32_t NetworkController::getNetworkForDns(unsigned* netId, uid_t uid) const {
@@ -285,7 +298,7 @@ uint32_t NetworkController::getNetworkForDns(unsigned* netId, uid_t uid) const {
         } else {
             // TODO: return an error instead of silently doing the DNS lookup on the wrong network.
             // http://b/27560555
-            if (mForcedNetId != NETID_UNSET) {
+            if ((mForcedNetId != NETID_UNSET) && (mNotForcedDnsUsers.find(uid) == mNotForcedDnsUsers.end())) {
                 *netId = mForcedNetId;
             } else {
                 *netId = mDefaultNetId;

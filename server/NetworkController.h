@@ -58,6 +58,8 @@ public:
     int setForcedNetwork(unsigned netId) WARN_UNUSED_RESULT;
     std::string getForcedInterface() const;
     int setForcedInterface(std::string interface) WARN_UNUSED_RESULT;
+    void addNotForcedDnsUsers(const std::vector<uid_t>& uids);
+    void removeNotForcedDnsUsers(const std::vector<uid_t>& uids);
 
     // Sets |*netId| to an appropriate NetId to use for DNS for the given user. Call with |*netId|
     // set to a non-NETID_UNSET value if the user already has indicated a preference. Returns the
@@ -121,6 +123,7 @@ private:
     unsigned mForcedNetId;
     std::string mForcedInterface;
     Permission mForcedPermission;
+    std::set<uid_t> mNotForcedDnsUsers;
     std::map<unsigned, Network*> mNetworks;  // Map keys are NetIds.
     std::map<uid_t, Permission> mUsers;
     std::set<uid_t> mProtectableUsers;
