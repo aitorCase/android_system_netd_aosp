@@ -1604,12 +1604,14 @@ int CommandListener::NetworkCommand::runCommand(SocketClient* client, int argc, 
         return success(client);
     }
 
-    //    0      1      2       3     4
-    // network force network   set  <netId>
-    // network force network   show
-    // network force interface set  <interface>
-    // network force interface show
-    // network force  clear
+    //    0      1      2          3      4
+    // network force network      set   <netId>
+    // network force network      show
+    // network force interface    set  <interface>
+    // network force interface    show
+    // network force   clear
+    // network force dnsexception add    <uid>    ...
+    // network force dnsexception remove <uid>    ...
     if (!strcmp(argv[1], "force")) {
         if (argc < 3) {
             return syntaxError(client, "Missing argument");
@@ -1659,6 +1661,23 @@ int CommandListener::NetworkCommand::runCommand(SocketClient* client, int argc, 
         } else if (!strcmp(argv[2], "clear")) {
             if (int ret = sNetCtrl->setForcedNetwork(NETID_UNSET)) {
                 return operationError(client, "setForceNetwork() failed", ret);
+            }
+        } else if (!strcmp(argv[2], "dnsexception")) {
+            if (argc < 5) {
+                return syntaxError(client, "Missing argument");
+            }
+
+            std::vector<uid_t> uids;
+            for (int i = 4; i < argc; ++i) {
+                 uids.push_back(strtoul(argv[i], NULL, 0));
+            }
+
+            if (!strcmp(argv[3], "add")) {
+                sNetCtrl->addNotForcedDnsUsers(uids);
+            } else if (!strcmp(argv[3], "remove")) {
+                sNetCtrl->removeNotForcedDnsUsers(uids);
+            } else {
+                return syntaxError(client, "Unknown argument");
             }
         } else {
             return syntaxError(client, "Unknown argument");
