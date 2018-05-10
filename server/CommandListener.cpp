@@ -1610,28 +1610,28 @@ int CommandListener::NetworkCommand::runCommand(SocketClient* client, int argc, 
                 }
                 if (forceNetwork) {
                     unsigned netId = stringToNetId(argv[4]);
-                    if (int ret = sNetCtrl->setForcedNetwork(netId)) {
+                    if (int ret = gCtls->netCtrl.setForcedNetwork(netId)) {
                         return operationError(client, "setForceNetwork() failed", ret);
                     }
                 } else {
-                    if (int ret = sNetCtrl->setForcedInterface(std::string(argv[4]))) {
+                    if (int ret = gCtls->netCtrl.setForcedInterface(std::string(argv[4]))) {
                         return operationError(client, "setForceNetwork() failed", ret);
                     }
                 }
             } else if (!strcmp(argv[3], "show")) {
                 if (forceNetwork) {
                     // TODO: ResponseCode is hardcoded. It should be defined in ResponseCode.h
-                    client->sendMsg(230, std::to_string(sNetCtrl->getForcedNetwork()).c_str(), false);
+                    client->sendMsg(230, std::to_string(gCtls->netCtrl.getForcedNetwork()).c_str(), false);
                 } else {
-                    //std::string interface = sNetCtrl->getForcedInterface();
+                    //std::string interface = gCtls->netCtrl.getForcedInterface();
                     //client->sendMsg(230, interface.empty() ? "unreachable" : interface.c_str(), false);
-                    client->sendMsg(230, sNetCtrl->getForcedInterface().c_str(), false);
+                    client->sendMsg(230, gCtls->netCtrl.getForcedInterface().c_str(), false);
                 }
             } else {
                 return syntaxError(client, "Unknown argument");
             }
         } else if (!strcmp(argv[2], "clear")) {
-            if (int ret = sNetCtrl->setForcedNetwork(NETID_UNSET)) {
+            if (int ret = gCtls->netCtrl.setForcedNetwork(NETID_UNSET)) {
                 return operationError(client, "setForceNetwork() failed", ret);
             }
         } else if (!strcmp(argv[2], "dnsexception")) {
@@ -1645,9 +1645,9 @@ int CommandListener::NetworkCommand::runCommand(SocketClient* client, int argc, 
             }
 
             if (!strcmp(argv[3], "add")) {
-                sNetCtrl->addNotForcedDnsUsers(uids);
+                gCtls->netCtrl.addNotForcedDnsUsers(uids);
             } else if (!strcmp(argv[3], "remove")) {
-                sNetCtrl->removeNotForcedDnsUsers(uids);
+                gCtls->netCtrl.removeNotForcedDnsUsers(uids);
             } else {
                 return syntaxError(client, "Unknown argument");
             }
