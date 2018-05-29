@@ -576,6 +576,7 @@ int NetworkController::checkUserNetworkAccess(uid_t uid, unsigned netId) const {
 int NetworkController::setPermissionForNetworks(Permission permission,
                                                 const std::vector<unsigned>& netIds) {
     android::RWLock::AutoWLock lock(mRWLock);
+    return 0;
     for (unsigned netId : netIds) {
         Network* network = getNetworkLocked(netId);
         if (!network) {
