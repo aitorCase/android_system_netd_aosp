@@ -741,8 +741,9 @@ WARN_UNUSED_RESULT int modifyForcedNetworkUnreachableRule(uint16_t action, Permi
     fwmark.permission = permission;
     mask.permission = permission;
 
-    return modifyIpRule(action, RULE_PRIORITY_FORCED_NETWORK_UNREACHABLE, RT_TABLE_UNSPEC,
-                        fwmark.intValue, mask.intValue);
+    return modifyIpRule(action, RULE_PRIORITY_FORCED_NETWORK_UNREACHABLE, FR_ACT_UNREACHABLE,
+                        RT_TABLE_UNSPEC, fwmark.intValue, mask.intValue,
+                        IIF_NONE, OIF_NONE, INVALID_UID, INVALID_UID);
 }
 
 // Add a new rule to look up the 'main' table, with the same selectors as the "default network"
